@@ -12,16 +12,15 @@ st.title("🧾 Dynamic Invoice Generator")
 
 # Determine base directory dynamically (assumes app.py is in UFLP/streamlit_app)
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(APP_DIR)
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
+if APP_DIR not in sys.path:
+    sys.path.insert(0, APP_DIR)
 
 # Find all template files
-template_files = glob.glob(os.path.join(BASE_DIR, "template_*.py"))
+template_files = glob.glob(os.path.join(APP_DIR, "template_*.py"))
 template_names = [os.path.basename(f) for f in template_files]
 
 if not template_names:
-    st.error(f"No templates found in {BASE_DIR}")
+    st.error(f"No templates found in {APP_DIR}")
     st.stop()
 
 selected_template = st.selectbox("Select a Template", sorted(template_names))
@@ -34,7 +33,7 @@ def load_module(filepath):
     
     # Temporarily change CWD and sys.path so template can find any local resources
     original_cwd = os.getcwd()
-    os.chdir(BASE_DIR)
+    os.chdir(APP_DIR)
     
     try:
         spec.loader.exec_module(module)
@@ -43,7 +42,7 @@ def load_module(filepath):
             
     return module
 
-selected_path = os.path.join(BASE_DIR, selected_template)
+selected_path = os.path.join(APP_DIR, selected_template)
 try:
     # We reload it without cache if we want dynamic variables, but caching the module object is fine
     # because we modify its attributes later. Actually, it's safer NOT to cache so that each selection starts fresh.
@@ -57,7 +56,7 @@ def get_module(filepath):
     spec = importlib.util.spec_from_file_location(module_name, filepath)
     module = importlib.util.module_from_spec(spec)
     original_cwd = os.getcwd()
-    os.chdir(BASE_DIR)
+    os.chdir(APP_DIR)
     try:
         spec.loader.exec_module(module)
     finally:
@@ -152,11 +151,11 @@ if st.button("🚀 Generate Invoice", type="primary"):
         
         # Execute invoice generation
         original_cwd = os.getcwd()
-        os.chdir(BASE_DIR)
+        os.chdir(APP_DIR)
         try:
             module.generate_invoice()
             output_file = getattr(module, "OUTPUT_FILE", "invoice.png")
-            out_path = os.path.join(BASE_DIR, output_file)
+            out_path = os.path.join(APP_DIR, output_file)
             
             if os.path.exists(out_path):
                 st.success("✅ Invoice generated successfully!")

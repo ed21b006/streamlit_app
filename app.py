@@ -4,7 +4,7 @@ import sys
 import glob
 import importlib.util
 import pandas as pd
-from PIL import Image
+from PIL import Image, ImageFont
 
 # Set page config
 st.set_page_config(page_title="Invoice Generator", layout="wide")
@@ -14,6 +14,28 @@ st.title("🧾 Dynamic Invoice Generator")
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
+
+# --- PATCH IMAGEFONT FOR DEPLOYMENT ---
+# The templates use hardcoded Linux font paths (/usr/share/...).
+# When deployed on Streamlit Cloud, those paths don't exist, causing fallback to tiny default fonts.
+# We intercept those calls to redirect them to our local 'fonts/' directory.
+original_truetype = ImageFont.truetype
+
+def patched_truetype(font=None, size=10, index=0, encoding='', layout_engine=None):
+    if isinstance(font, str):
+        if "DejaVuSansMono-Bold" in font:
+            font = os.path.join(APP_DIR, "fonts", "DejaVuSansMono-Bold.ttf")
+        elif "DejaVuSans" in font or "DejaVu" in font:
+            font = os.path.join(APP_DIR, "fonts", "DejaVuSansMono.ttf")
+    
+    try:
+        return original_truetype(font, size, index, encoding, layout_engine)
+    except OSError:
+        # Final fallback to standard local font if it fails for some reason
+        return original_truetype(os.path.join(APP_DIR, "fonts", "DejaVuSansMono.ttf"), size, index, encoding, layout_engine)
+
+ImageFont.truetype = patched_truetype
+# --------------------------------------
 
 # Find all template files
 template_files = glob.glob(os.path.join(APP_DIR, "template_*.py"))

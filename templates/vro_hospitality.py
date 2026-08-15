@@ -59,26 +59,7 @@ COVERS          = "5"                 # number of guests
 #   rate      (float or 0)  – rate; 0 for sub-items
 #   amount    (float or 0)  – override amount; use 0 to auto-calculate (qty*rate)
 #                             For sub-items set all to 0 and amount=0 → shows 0.00
-ITEMS = [
-    {"sno": 1, "name": "GINGER ALE",          "qty": 3, "rate": 130.00, "amount": 0},
-    {"sno": 2, "name": "Brownie",              "qty": 2, "rate": 230.00, "amount": 0},
-    {"sno": 3, "name": "Seasoned Fries",       "qty": 1, "rate": 270.00, "amount": 0},
-    {"sno": 4, "name": "Tuesday 1 Dozer",      "qty": 1, "rate": 315.00, "amount": 0},
-    # {"sno": "",  "name": "  NAKED PERI PERI",  "qty": 0, "rate": 0,      "amount": 0},
-    # {"sno": 5, "name": "Tuesday 1/2 Doz",      "qty": 10, "rate": 225.00, "amount": 0},
-    # {"sno": "",  "name": "  NAKED PERI PERI",  "qty": 0, "rate": 0,      "amount": 0},
-    # {"sno": "",  "name": "  SPICY GARLIC",     "qty": 0, "rate": 0,      "amount": 0},
-    # {"sno": "",  "name": "  FIRE CRACKER",     "qty": 0, "rate": 0,      "amount": 0},
-    # {"sno": "",  "name": "  ABS",              "qty": 0, "rate": 0,      "amount": 0},
-    # {"sno": "",  "name": "  FLAMING JALAPENO", "qty": 0, "rate": 0,      "amount": 0},
-    # {"sno": "",  "name": "  FIRE CRACKER",     "qty": 0, "rate": 0,      "amount": 0},
-    # {"sno": "",  "name": "  CREAMY BUFFALO",   "qty": 0, "rate": 0,      "amount": 0},
-    # {"sno": "",  "name": "  HONEY CHILLI",     "qty": 0, "rate": 0,      "amount": 0},
-    # {"sno": "",  "name": "  ABS",              "qty": 0, "rate": 0,      "amount": 0},
-    # {"sno": 6, "name": "MANGOBLOOM*",          "qty": 1, "rate": 280.00, "amount": 0},
-    # {"sno": 7, "name": "TEETOTTALERS",         "qty": 1, "rate": 280.00, "amount": 0},
-    # {"sno": 8, "name": "ELECTRIC CURF",        "qty": 1, "rate": 280.00, "amount": 0},
-]
+ITEMS = []
 
 SERC_RATE       = 10.0                # service charge %
 STATE_GST_RATE  = 2.5                 # state GST %

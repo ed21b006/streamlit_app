@@ -48,12 +48,7 @@ TIME       = "09:15 PM"
 COVERS     = "3"
 CASHIER    = "Server"
 
-ITEMS = [
-    ("Bira White (500 ml)",      2, 390.00),
-    ("Garlic Bread",             1, 190.00),
-    ("Firecracker Chicken Wings",1, 470.00),
-    ("Toit Signature Pizza",     1, 530.00),
-]
+ITEMS = []
 
 SC_RATE   = 10.0   # Service Charge %
 CGST_RATE = 2.5

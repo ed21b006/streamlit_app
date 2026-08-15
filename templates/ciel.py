@@ -52,11 +52,7 @@ KOTS            = "41637, 41647"  # Kitchen Order Tokens; leave "" to hide row
 
 # Menu items: list of (description, qty, rate)
 # qty=0 means qty/rate/amount are hidden (e.g. no-charge garnish lines)
-ITEMS = [
-    ("MINERAL WATER",              1,  69.00),
-    ("STIR FRY YAKI SOBA NO ODLE", 1, 339.00),
-    ("MAMA ROSA PENNE",             1, 459.00),
-]
+ITEMS = []
 
 # Tax rates (percent, applied on sub_total)
 SGST_PERCENT = 2.5

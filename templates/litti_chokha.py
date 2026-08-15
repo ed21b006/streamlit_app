@@ -45,9 +45,7 @@ CASHIER         = "biller"
 BILL_NO         = "42422"
 TOKEN_NO        = "103"
 
-ITEMS = [
-    ("Chicken Litti (Regular (2pc Litti & 2Pc Champaran Chicken))", 1, 280.00),
-]
+ITEMS = []
 
 THANK_YOU_MSG = "Thank You. Please Visit Again"
 OUTPUT_FILE   = "litti_chokha_invoice.png"

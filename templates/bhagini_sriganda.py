@@ -48,12 +48,7 @@ TABLE_NO        = "#37"
 DATE            = "16 May 2024"       # e.g. "16 May 2024"
 
 # Menu items: list of (name, unit_price, qty)
-ITEMS = [
-    ("Mutton biriyani", 400, 4),
-    ("Tandoori Roti",    30, 5),
-    ("Chilly chicken",  250, 2),
-    ("Chicken pepper",  250, 3),
-]
+ITEMS = []
 
 CGST_RATE       = 2.5                 # percentage
 SGST_RATE       = 2.5                 # percentage

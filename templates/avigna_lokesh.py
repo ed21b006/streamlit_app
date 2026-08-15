@@ -51,14 +51,7 @@ BILL_NO         = "34653"
 TOKEN_NOS       = "139, 161, 166"     # comma-separated token numbers; leave blank to hide
 
 # Menu items: list of (name, qty, unit_price)
-ITEMS = [
-    ("Mushroom Manchurian", 2, 200.00),
-    ("Mushroom Kadai",      2, 200.00),
-    ("Roti (plain)",        8,  35.00),
-    ("Water",               2,  34.00),
-    ("Chicken Biryani",     2, 230.00),
-    ("Veg Biryani",         1, 160.00),
-]
+ITEMS = []
 
 CGST_RATE       = 2.5                 # percentage
 SGST_RATE       = 2.5                 # percentage

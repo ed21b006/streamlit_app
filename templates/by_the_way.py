@@ -50,10 +50,7 @@ WAITER          = "waiter"
 CATEGORY_TAG    = "*Food*"
 
 # Menu items: list of (name, qty, rate)
-ITEMS = [
-    ("Peri Peri French Fries", 1, 185.0),
-    ("Container Charges 1",    1,  10.0),
-]
+ITEMS = []
 
 SC_RATE   = 5.00    # Service Charge %
 SGST_RATE = 2.50    # %

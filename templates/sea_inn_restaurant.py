@@ -39,14 +39,7 @@ DATE            = "16-02-2018"
 
 # Menu items: list of (description, qty, rate)
 # Note: rate and qty are integers in this template
-ITEMS = [
-    ("MUTN.BIRYANI",    1, 220.00),
-    ("PRAWN FRY",       1, 210.00),
-    ("LIVER FRY",       1, 140.00),
-    ("RICE.SMBR.CURD",  2,  60.00),
-    ("COOLDRINK",       3,  20.00),
-    ("TIN COOL DRINK",  1,  40.00),
-]
+ITEMS = []
 
 PAYMENT_MODE  = "CASH"              # "CASH" / "UPI" / "CARD"
 FOOTER_NOTE   = "THANQ VISIT AGAIN"

@@ -42,14 +42,7 @@ TABLE_NO        = "8"
 WAITER_NO       = "12"
 
 # Menu items: list of (name, qty, rate)
-ITEMS = [
-    ("BENNE MASALE DOSE5", 5,  50.00),
-    ("IDLY",               2,  20.00),
-    ("SET DOSE",           1,  45.00),
-    ("CHOW CHOW BATH",     1,  40.00),
-    ("COFFEE",             4,  15.00),
-    ("EXTRA",              3,   1.00),
-]
+ITEMS = []
 
 FOOTER_MSG = "THANK YOU ,VISIT AGAIN"
 

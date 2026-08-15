@@ -56,9 +56,7 @@ ROLE             = "Manager"           # e.g. "Manager", "Cashier"
 
 # Menu items: list of (name, qty, rate)
 # For long item names that wrap, just write them fully — the script wraps them.
-ITEMS = [
-    ("Butterscotch Ribbon Ice Cream (Small Scoop 62 gm)", 1, 72),
-]
+ITEMS = []
 
 # Tax rates (percent, applied on sub_total)
 CGST_PERCENT = 2.5

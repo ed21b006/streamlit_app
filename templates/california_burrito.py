@@ -46,12 +46,7 @@ TIME         = "10:31 PM"
 MOBILE       = "8278693542"
 POINTS_EARNED= "67"
 
-ITEMS = [
-    ("Chicken (Chili Chipotle) Bowl", 2, 279.0),
-    ("Chicken (Crispy) Bowl",          2, 279.0),
-    ("Paneer (BBQ) Bowl",              2, 279.0),
-    ("Bagasse Bowl Big Free",          6,   0.0),
-]
+ITEMS = []
 
 DISCOUNT      = 0.00
 OTHER_CHARGES = 0.00

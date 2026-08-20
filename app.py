@@ -6,21 +6,192 @@ import importlib.util
 import pandas as pd
 from PIL import Image, ImageFont
 import re
+import json
+import inspect
+import io
+import zipfile
 
 # Set page config
 st.set_page_config(page_title="Invoice Generator", layout="wide")
-st.title("🧾 Dynamic Invoice Generator")
 
-# Determine base directory dynamically (assumes app.py is in UFLP/streamlit_app)
+# Determine base directory dynamically
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(APP_DIR, "templates")
 MENUS_DIR = os.path.join(APP_DIR, "menus")
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
+from dateutil.parser import parse as date_parse
+
+# ─────────────────────────────────────────────
+#  PATTERN LOCK AUTHENTICATION
+# ─────────────────────────────────────────────
+CORRECT_PATTERN = [4, 2, 5, 3]  # 3x3 grid, 1-indexed: top-left=1 ... bottom-right=9
+
+def show_pattern_lock():
+    """Render a 3x3 pattern lock grid using Streamlit buttons."""
+    st.markdown("""
+    <style>
+    .lock-container {
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; min-height: 70vh;
+    }
+    .lock-title {
+        font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .lock-sub { color: #888; margin-bottom: 2rem; font-size: 1rem; }
+    div[data-testid="stHorizontalBlock"] button {
+        width: 80px !important; height: 80px !important;
+        border-radius: 50% !important; font-size: 1.2rem !important;
+        font-weight: 700 !important;
+    }
+    .pattern-display {
+        font-size: 1.5rem; letter-spacing: 0.5rem; margin: 1rem 0;
+        min-height: 2.5rem; color: #667eea; font-weight: 600;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="lock-container">', unsafe_allow_html=True)
+    st.markdown('<div class="lock-title">🔒 Pattern Lock</div>', unsafe_allow_html=True)
+    st.markdown('<div class="lock-sub">Tap the dots in the correct order</div>', unsafe_allow_html=True)
+
+    if "pattern_input" not in st.session_state:
+        st.session_state.pattern_input = []
+    if "pattern_error" not in st.session_state:
+        st.session_state.pattern_error = False
+
+    # Show current pattern progress
+    dots = " → ".join(str(d) for d in st.session_state.pattern_input) if st.session_state.pattern_input else "..."
+    st.markdown(f'<div class="pattern-display">{dots}</div>', unsafe_allow_html=True)
+
+    if st.session_state.pattern_error:
+        st.error("❌ Wrong pattern! Try again.")
+
+    # 3x3 grid
+    for row in range(3):
+        cols = st.columns([1, 1, 1, 2])  # extra col for spacing
+        for col_idx in range(3):
+            dot_num = row * 3 + col_idx + 1
+            already_pressed = dot_num in st.session_state.pattern_input
+            label = "●" if already_pressed else "○"
+            if cols[col_idx].button(label, key=f"dot_{dot_num}", disabled=already_pressed, use_container_width=True):
+                st.session_state.pattern_input.append(dot_num)
+                st.session_state.pattern_error = False
+                # Check if pattern is complete
+                if len(st.session_state.pattern_input) == len(CORRECT_PATTERN):
+                    if st.session_state.pattern_input == CORRECT_PATTERN:
+                        st.session_state.authenticated = True
+                        st.session_state.pattern_input = []
+                        st.rerun()
+                    else:
+                        st.session_state.pattern_error = True
+                        st.session_state.pattern_input = []
+                        st.rerun()
+                else:
+                    st.rerun()
+
+    # Reset button
+    if st.button("🔄 Reset", use_container_width=False):
+        st.session_state.pattern_input = []
+        st.session_state.pattern_error = False
+        st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────
+#  AUTH GATE
+# ─────────────────────────────────────────────
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    show_pattern_lock()
+    st.stop()
+
+
+# ─────────────────────────────────────────────
+#  BACKUP / RESTORE (sidebar)
+# ─────────────────────────────────────────────
+def create_backup_zip():
+    """Zip templates/ and menus/ directories."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for folder in ["templates", "menus"]:
+            folder_path = os.path.join(APP_DIR, folder)
+            if os.path.isdir(folder_path):
+                for root, dirs, files in os.walk(folder_path):
+                    # Skip __pycache__
+                    dirs[:] = [d for d in dirs if d != "__pycache__"]
+                    for fname in files:
+                        fpath = os.path.join(root, fname)
+                        arcname = os.path.relpath(fpath, APP_DIR)
+                        zf.write(fpath, arcname)
+    buf.seek(0)
+    return buf.getvalue()
+
+def restore_from_zip(zip_bytes):
+    """Restore templates/ and menus/ from uploaded zip."""
+    buf = io.BytesIO(zip_bytes)
+    with zipfile.ZipFile(buf, "r") as zf:
+        for member in zf.namelist():
+            # Only allow templates/ and menus/ to be restored
+            if member.startswith("templates/") or member.startswith("menus/"):
+                target = os.path.join(APP_DIR, member)
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                if not member.endswith("/"):
+                    with zf.open(member) as src, open(target, "wb") as dst:
+                        dst.write(src.read())
+
+with st.sidebar:
+    st.markdown("### 💾 Backup & Restore")
+    st.caption("Templates & menus are lost when the cloud app sleeps. Download a backup and restore when needed.")
+    
+    backup_data = create_backup_zip()
+    st.download_button(
+        "⬇️ Download Backup",
+        data=backup_data,
+        file_name="invoice_app_backup.zip",
+        mime="application/zip",
+        use_container_width=True
+    )
+    
+    uploaded_zip = st.file_uploader("Upload Backup to Restore", type=["zip"], key="restore_zip")
+    if uploaded_zip is not None:
+        if st.button("🔄 Restore from Backup", use_container_width=True):
+            try:
+                restore_from_zip(uploaded_zip.getvalue())
+                st.success("✅ Restored! Refreshing...")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Restore failed: {e}")
+    
+    st.markdown("---")
+
+
+# ─────────────────────────────────────────────
+#  MAIN APP (original app.py logic below)
+# ─────────────────────────────────────────────
+
+st.title("🧾 Dynamic Invoice Generator")
+
+@st.cache_resource
+def clear_old_invoices():
+    for ext in ["*.png", "*.pdf"]:
+        for f in glob.glob(os.path.join(APP_DIR, ext)):
+            try:
+                os.remove(f)
+            except Exception:
+                pass
+    return True
+
+clear_old_invoices()
+
 # --- PATCH IMAGEFONT FOR DEPLOYMENT ---
-# The templates use hardcoded Linux font paths (/usr/share/...).
-# When deployed on Streamlit Cloud, those paths don't exist, causing fallback to tiny default fonts.
+# The templates use hardcoded Linux font paths (/usr/share/...).\n# When deployed on Streamlit Cloud, those paths don't exist, causing fallback to tiny default fonts.
 # We intercept those calls to redirect them to our local 'fonts/' directory.
 original_truetype = ImageFont.truetype
 
@@ -129,9 +300,6 @@ for i, var in enumerate(other_vars):
         # Fallback for unexpected types
         val = target_col.text_input(var, value=str(current_val))
         new_values[var] = (val, type(current_val))
-
-import json
-import inspect
 
 def calculate_live_total(module, new_values, items_list):
     if not items_list:
@@ -242,6 +410,7 @@ else:
     menu_items = {}
 
 with st.expander("📖 Manage Menu"):
+    # --- Add new item ---
     c1, c2, c3 = st.columns([2, 1, 1])
     n_name = c1.text_input("New Menu Item Name")
     n_price = c2.number_input("New Menu Item Price", min_value=0.0, step=1.0)
@@ -252,6 +421,21 @@ with st.expander("📖 Manage Menu"):
                 json.dump(menu_items, f, indent=4)
             st.success(f"Added {n_name} to menu!")
             st.rerun()
+
+    # --- Display existing items with prices & delete ---
+    if menu_items:
+        st.markdown("**Current Menu Items:**")
+        for item_name, item_price in sorted(menu_items.items()):
+            mc1, mc2, mc3 = st.columns([3, 1, 0.5])
+            mc1.write(item_name)
+            mc2.write(f"₹ {item_price:.2f}")
+            if mc3.button("🗑️", key=f"del_menu_{item_name}", help=f"Delete {item_name}"):
+                del menu_items[item_name]
+                with open(menu_path, "w") as f:
+                    json.dump(menu_items, f, indent=4)
+                st.rerun()
+    else:
+        st.caption("No items in menu yet.")
 
 if items_var:
     df = pd.DataFrame(st.session_state.invoice_items)
@@ -269,10 +453,12 @@ tot_placeholder.metric("Live Total", f"₹ {live_tot:.2f}")
 
 st.write("### Add Menu Item to Invoice")
 ac1, ac2, ac3 = st.columns([2, 1, 1])
-sel_item = ac1.selectbox("Select from Menu", ["-- Select --"] + list(menu_items.keys()))
+menu_display = {f"{name}  —  ₹{price:.2f}": name for name, price in menu_items.items()}
+sel_display = ac1.selectbox("Select from Menu", ["-- Select --"] + list(menu_display.keys()))
 qty = ac2.number_input("Quantity", min_value=1, step=1, value=1)
 if ac3.button("Add to Invoice", use_container_width=True):
-    if sel_item != "-- Select --":
+    if sel_display != "-- Select --":
+        sel_item = menu_display[sel_display]
         price = menu_items[sel_item]
         st.session_state.invoice_items.append({"Name": sel_item, "Qty": qty, "Rate": price})
         st.rerun()
@@ -331,7 +517,6 @@ st.header("🗑️ Delete Template")
 with st.expander("Delete this template and its menu", expanded=False):
     st.warning(f"Are you sure you want to delete '{selected_template}'?")
     if st.button("Confirm Delete"):
-        import os
         if os.path.exists(selected_path):
             os.remove(selected_path)
         if os.path.exists(menu_path):
@@ -358,6 +543,50 @@ if st.button("🚀 Generate Invoice", type="primary"):
             else:
                 final_items = new_items_list
             setattr(module, items_var, final_items)
+            
+        # Determine dynamic filename
+        date_str = ""
+        time_str = ""
+        
+        if "DATE" in new_values:
+            date_str = new_values["DATE"][0]
+        elif hasattr(module, "DATE"):
+            date_str = getattr(module, "DATE")
+            
+        if "TIME" in new_values:
+            time_str = new_values["TIME"][0]
+        elif hasattr(module, "TIME"):
+            time_str = getattr(module, "TIME")
+            
+        dynamic_name = getattr(module, "OUTPUT_FILE", "invoice.png")
+        if date_str:
+            try:
+                parsed_date = date_parse(str(date_str))
+                day = parsed_date.day
+                month = parsed_date.strftime("%B")
+                
+                meal_type = ""
+                if time_str:
+                    try:
+                        parsed_time = date_parse(str(time_str))
+                        hour = parsed_time.hour
+                        if hour < 12:
+                            meal_type = "Breakfast"
+                        elif hour < 16:
+                            meal_type = "Lunch"
+                        else:
+                            meal_type = "Dinner"
+                    except Exception:
+                        pass
+                
+                if meal_type:
+                    dynamic_name = f"{meal_type} {day} {month}.png"
+                else:
+                    dynamic_name = f"{day} {month}.png"
+            except Exception:
+                pass
+                
+        setattr(module, "OUTPUT_FILE", dynamic_name)
         
         # Execute invoice generation
         original_cwd = os.getcwd()

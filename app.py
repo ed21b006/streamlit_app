@@ -26,136 +26,164 @@ from dateutil.parser import parse as date_parse
 # ─────────────────────────────────────────────
 #  PATTERN LOCK AUTHENTICATION
 # ─────────────────────────────────────────────
-CORRECT_PATTERN = [4, 2, 5, 3]  # 3x3 grid, 1-indexed: top-left=1 ... bottom-right=9
+CORRECT_PATTERN = "4,2,5,3"
 
 def show_pattern_lock():
-    """Render a 3x3 pattern lock grid using native Streamlit buttons, with CSS to force a grid layout on mobile."""
-    
-    # Hide sidebar & Streamlit chrome on lock screen, and perfectly center everything vertically
+    """Render a 3x3 pattern lock as a self-contained HTML/JS component."""
+    import streamlit.components.v1 as components
+
+    # Hide sidebar & Streamlit chrome on lock screen, and hide the native Streamlit unlock button
     st.markdown("""<style>
     [data-testid="stSidebar"], [data-testid="stSidebarNav"],
     header, footer, #MainMenu {display: none !important;}
-    
-    /* Make the entire Streamlit body act as a flex container to center the lock */
-    .block-container {
-        padding-top: 0 !important; max-width: 100% !important;
-        display: flex !important; flex-direction: column !important;
-        justify-content: center !important; align-items: center !important;
-        min-height: 100vh !important;
-    }
+    .block-container {padding-top: 0 !important; max-width: 100% !important;}
     [data-testid="stAppViewContainer"] {background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);}
     
-    /* Lock UI Styles */
+    /* Hide the Streamlit trigger button used for unlocking */
+    div[data-testid="stButton"] {display: none !important;}
+    </style>""", unsafe_allow_html=True)
+
+    components.html("""
+    <!DOCTYPE html>
+    <html><head><style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        display: flex; justify-content: center; align-items: center;
+        min-height: 480px; height: 100%;
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        background: transparent; color: #fff;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none; -webkit-user-select: none;
+    }
+    .lock-wrap { text-align: center; }
+    .lock-icon { font-size: 2.5rem; margin-bottom: 0.3rem; }
     .lock-title {
-        font-size: 2.2rem; font-weight: 700; margin-bottom: 0.5rem; text-align: center;
+        font-size: 1.8rem; font-weight: 700; margin-bottom: 0.2rem;
         background: linear-gradient(135deg, #667eea, #a78bfa);
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
-    .lock-sub { color: #aaa; margin-bottom: 2rem; font-size: 1rem; text-align: center; }
-    .pattern-display {
-        font-size: 1.5rem; letter-spacing: 0.5rem; margin: 1rem 0; text-align: center;
-        min-height: 2.5rem; font-weight: 600;
+    .lock-sub { color: #aaa; font-size: 0.95rem; margin-bottom: 1.5rem; }
+    .progress {
+        min-height: 2.5rem; font-size: 1.3rem; letter-spacing: 0.4rem;
+        color: #a78bfa; font-weight: 600; margin-bottom: 1rem;
     }
+    .grid {
+        display: grid; grid-template-columns: repeat(3, 75px);
+        grid-template-rows: repeat(3, 75px);
+        gap: 15px; justify-content: center; margin-bottom: 1.5rem;
+    }
+    .dot {
+        width: 75px; height: 75px; border-radius: 50%;
+        border: 2.5px solid rgba(255,255,255,0.25);
+        background: rgba(255,255,255,0.06);
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: all 0.2s ease;
+        font-size: 1.6rem; color: rgba(255,255,255,0.35);
+    }
+    .dot:hover { border-color: rgba(167,139,250,0.6); background: rgba(167,139,250,0.1); }
+    .dot:active { transform: scale(0.92); }
+    .dot.selected {
+        border-color: #667eea; background: rgba(102,126,234,0.25);
+        color: #a78bfa; box-shadow: 0 0 16px rgba(102,126,234,0.35);
+    }
+    .dot.wrong {
+        border-color: #ef4444; background: rgba(239,68,68,0.2);
+        color: #ef4444; animation: shake 0.4s ease;
+    }
+    @keyframes shake {
+        0%,100% { transform: translateX(0); }
+        25% { transform: translateX(-6px); }
+        75% { transform: translateX(6px); }
+    }
+    .error { color: #ef4444; font-size: 0.95rem; min-height: 1.5rem; margin-bottom: 0.5rem; }
+    .reset-btn {
+        background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+        color: #ccc; padding: 0.5rem 1.6rem; border-radius: 8px;
+        cursor: pointer; font-size: 0.9rem; transition: all 0.2s;
+    }
+    .reset-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
     
-    /* Force Streamlit Columns to act as a Grid on Mobile */
-    div[data-testid="stHorizontalBlock"] {
-        flex-direction: row !important;
-        flex-wrap: nowrap !important; /* Prevent wrapping on small screens */
-        justify-content: center !important;
-        align-items: center !important;
-        gap: 0.5rem !important;
-        padding: 0 !important;
-        margin: 0 auto !important;
-        max-width: 250px !important;
+    @media (max-width: 400px) {
+        .grid { grid-template-columns: repeat(3, 65px); grid-template-rows: repeat(3, 65px); gap: 12px; }
+        .dot { width: 65px; height: 65px; font-size: 1.4rem; }
     }
-    div[data-testid="column"] {
-        width: 70px !important;
-        flex: 0 0 70px !important;
-        min-width: 70px !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        display: flex !important;
-        justify-content: center !important;
+    </style></head>
+    <body>
+    <div class="lock-wrap">
+        <div class="lock-icon">🔒</div>
+        <div class="lock-title">Pattern Lock</div>
+        <div class="lock-sub">Tap the dots in the correct order</div>
+        <div class="progress" id="progress">. . .</div>
+        <div class="error" id="error"></div>
+        <div class="grid" id="grid"></div>
+        <button class="reset-btn" onclick="resetPattern()">🔄 Reset</button>
+    </div>
+    <script>
+    const CORRECT = [4,2,5,3];
+    let selected = [];
+    const grid = document.getElementById('grid');
+    const progress = document.getElementById('progress');
+    const error = document.getElementById('error');
+
+    for (let i = 1; i <= 9; i++) {
+        const d = document.createElement('div');
+        d.className = 'dot';
+        d.textContent = '○';
+        d.dataset.num = i;
+        d.addEventListener('click', () => tapDot(i, d));
+        grid.appendChild(d);
     }
-    
-    /* Style the Buttons */
-    div[data-testid="stHorizontalBlock"] button {
-        width: 65px !important; height: 65px !important;
-        border-radius: 50% !important; font-size: 1.4rem !important;
-        font-weight: 700 !important;
-        background: rgba(255,255,255,0.06) !important;
-        border: 2px solid rgba(255,255,255,0.25) !important;
-        color: rgba(255,255,255,0.4) !important;
-        transition: all 0.2s ease !important;
-        margin: 0 !important; padding: 0 !important;
+
+    function tapDot(num, el) {
+        if (selected.includes(num)) return;
+        selected.push(num);
+        el.classList.add('selected');
+        el.textContent = '●';
+        error.textContent = '';
+        progress.textContent = selected.join(' → ');
+
+        if (selected.length === CORRECT.length) {
+            if (JSON.stringify(selected) === JSON.stringify(CORRECT)) {
+                progress.style.color = '#4ade80';
+                progress.textContent = '✓ Unlocked';
+                setTimeout(() => {
+                    // Click the hidden Streamlit button using textContent.includes
+                    try {
+                        const btns = window.parent.document.querySelectorAll('button');
+                        for (const btn of btns) {
+                            if (btn.textContent.includes('UNLOCK_TRIGGER_12345')) {
+                                btn.click();
+                                return;
+                            }
+                        }
+                    } catch(e) { console.error('Unlock error:', e); }
+                }, 400);
+            } else {
+                error.textContent = '❌ Wrong pattern!';
+                document.querySelectorAll('.dot').forEach(d => d.classList.add('wrong'));
+                setTimeout(resetPattern, 800);
+            }
+        }
     }
-    div[data-testid="stHorizontalBlock"] button:hover {
-        border-color: rgba(167,139,250,0.6) !important;
-        background: rgba(167,139,250,0.1) !important;
+
+    function resetPattern() {
+        selected = [];
+        error.textContent = '';
+        progress.textContent = '. . .';
+        progress.style.color = '#a78bfa';
+        document.querySelectorAll('.dot').forEach(d => {
+            d.className = 'dot';
+            d.textContent = '○';
+        });
     }
-    div[data-testid="stHorizontalBlock"] button:disabled {
-        border-color: #667eea !important;
-        background: rgba(102,126,234,0.25) !important;
-        color: #a78bfa !important;
-    }
-    
-    /* Reset Button Exception */
-    .reset-row div[data-testid="stHorizontalBlock"] button {
-        width: auto !important; height: auto !important;
-        border-radius: 8px !important; font-size: 1rem !important;
-        padding: 0.5rem 1.5rem !important; margin-top: 1.5rem !important;
-    }
-    </style>""", unsafe_allow_html=True)
+    </script>
+    </body></html>
+    """, height=520)
 
-    st.markdown('<div class="lock-title">🔒 Pattern Lock</div>', unsafe_allow_html=True)
-    st.markdown('<div class="lock-sub">Tap the dots in the correct order</div>', unsafe_allow_html=True)
-
-    if "pattern_input" not in st.session_state:
-        st.session_state.pattern_input = []
-    if "pattern_error" not in st.session_state:
-        st.session_state.pattern_error = False
-
-    # Show current pattern progress
-    dots = " → ".join(str(d) for d in st.session_state.pattern_input) if st.session_state.pattern_input else ". . ."
-    color = "#ef4444" if st.session_state.pattern_error else "#a78bfa"
-    st.markdown(f'<div class="pattern-display" style="color: {color};">{dots}</div>', unsafe_allow_html=True)
-
-    if st.session_state.pattern_error:
-        st.error("❌ Wrong pattern!")
-
-    # 3x3 grid using native columns
-    for row in range(3):
-        cols = st.columns([1, 1, 1])
-        for col_idx in range(3):
-            dot_num = row * 3 + col_idx + 1
-            already_pressed = dot_num in st.session_state.pattern_input
-            label = "●" if already_pressed else "○"
-            
-            if cols[col_idx].button(label, key=f"dot_{dot_num}", disabled=already_pressed):
-                st.session_state.pattern_input.append(dot_num)
-                st.session_state.pattern_error = False
-                
-                # Check if pattern is complete
-                if len(st.session_state.pattern_input) == len(CORRECT_PATTERN):
-                    if st.session_state.pattern_input == CORRECT_PATTERN:
-                        st.session_state.authenticated = True
-                        st.session_state.pattern_input = []
-                        st.rerun()
-                    else:
-                        st.session_state.pattern_error = True
-                        st.session_state.pattern_input = []
-                        st.rerun()
-                else:
-                    st.rerun()
-
-    # Reset button in its own styled container
-    st.markdown('<div class="reset-row">', unsafe_allow_html=True)
-    if st.button("🔄 Reset", use_container_width=False):
-        st.session_state.pattern_input = []
-        st.session_state.pattern_error = False
+    # Hidden unlock button for the JS above to click
+    if st.button("UNLOCK_TRIGGER_12345", key="hidden_unlock_btn"):
+        st.session_state.authenticated = True
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────

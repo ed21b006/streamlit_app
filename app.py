@@ -29,32 +29,74 @@ from dateutil.parser import parse as date_parse
 CORRECT_PATTERN = [4, 2, 5, 3]  # 3x3 grid, 1-indexed: top-left=1 ... bottom-right=9
 
 def show_pattern_lock():
-    """Render a 3x3 pattern lock grid using Streamlit buttons."""
-    st.markdown("""
-    <style>
-    .lock-container {
-        display: flex; flex-direction: column; align-items: center;
-        justify-content: center; min-height: 70vh;
+    """Render a 3x3 pattern lock grid using native Streamlit buttons, with CSS to force a grid layout on mobile."""
+    
+    # Hide sidebar & Streamlit chrome on lock screen, and perfectly center everything vertically
+    st.markdown("""<style>
+    [data-testid="stSidebar"], [data-testid="stSidebarNav"],
+    header, footer, #MainMenu {display: none !important;}
+    
+    /* Make the entire Streamlit body act as a flex container to center the lock */
+    .block-container {
+        padding-top: 0 !important; max-width: 100% !important;
+        display: flex !important; flex-direction: column !important;
+        justify-content: center !important; align-items: center !important;
+        min-height: 100vh !important;
     }
+    [data-testid="stAppViewContainer"] {background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);}
+    
+    /* Lock UI Styles */
     .lock-title {
-        font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;
-        background: linear-gradient(135deg, #667eea, #764ba2);
+        font-size: 2.2rem; font-weight: 700; margin-bottom: 0.5rem; text-align: center;
+        background: linear-gradient(135deg, #667eea, #a78bfa);
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
-    .lock-sub { color: #888; margin-bottom: 2rem; font-size: 1rem; }
-    div[data-testid="stHorizontalBlock"] button {
-        width: 80px !important; height: 80px !important;
-        border-radius: 50% !important; font-size: 1.2rem !important;
-        font-weight: 700 !important;
-    }
+    .lock-sub { color: #aaa; margin-bottom: 2rem; font-size: 1rem; text-align: center; }
     .pattern-display {
-        font-size: 1.5rem; letter-spacing: 0.5rem; margin: 1rem 0;
-        min-height: 2.5rem; color: #667eea; font-weight: 600;
+        font-size: 1.5rem; letter-spacing: 0.5rem; margin: 1rem 0; text-align: center;
+        min-height: 2.5rem; font-weight: 600;
     }
-    </style>
-    """, unsafe_allow_html=True)
+    
+    /* Force Streamlit Columns to act as a Grid on Mobile */
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important; /* Prevent wrapping on small screens */
+        justify-content: center !important;
+        gap: 0.5rem !important;
+    }
+    div[data-testid="column"] {
+        width: auto !important;
+        flex: 0 0 auto !important;
+        min-width: auto !important;
+    }
+    
+    /* Style the Buttons */
+    div[data-testid="stHorizontalBlock"] button {
+        width: 70px !important; height: 70px !important;
+        border-radius: 50% !important; font-size: 1.4rem !important;
+        font-weight: 700 !important;
+        background: rgba(255,255,255,0.06) !important;
+        border: 2px solid rgba(255,255,255,0.25) !important;
+        color: rgba(255,255,255,0.4) !important;
+        transition: all 0.2s ease !important;
+    }
+    div[data-testid="stHorizontalBlock"] button:hover {
+        border-color: rgba(167,139,250,0.6) !important;
+        background: rgba(167,139,250,0.1) !important;
+    }
+    div[data-testid="stHorizontalBlock"] button:disabled {
+        border-color: #667eea !important;
+        background: rgba(102,126,234,0.25) !important;
+        color: #a78bfa !important;
+    }
+    
+    /* Reset Button Exception */
+    .reset-row div[data-testid="stHorizontalBlock"] button {
+        width: auto !important; height: auto !important;
+        border-radius: 8px !important; font-size: 1rem !important;
+        padding: 0.5rem 1.5rem !important; margin-top: 1.5rem !important;
+    }
+    </style>""", unsafe_allow_html=True)
 
-    st.markdown('<div class="lock-container">', unsafe_allow_html=True)
     st.markdown('<div class="lock-title">🔒 Pattern Lock</div>', unsafe_allow_html=True)
     st.markdown('<div class="lock-sub">Tap the dots in the correct order</div>', unsafe_allow_html=True)
 
@@ -64,22 +106,25 @@ def show_pattern_lock():
         st.session_state.pattern_error = False
 
     # Show current pattern progress
-    dots = " → ".join(str(d) for d in st.session_state.pattern_input) if st.session_state.pattern_input else "..."
-    st.markdown(f'<div class="pattern-display">{dots}</div>', unsafe_allow_html=True)
+    dots = " → ".join(str(d) for d in st.session_state.pattern_input) if st.session_state.pattern_input else ". . ."
+    color = "#ef4444" if st.session_state.pattern_error else "#a78bfa"
+    st.markdown(f'<div class="pattern-display" style="color: {color};">{dots}</div>', unsafe_allow_html=True)
 
     if st.session_state.pattern_error:
-        st.error("❌ Wrong pattern! Try again.")
+        st.error("❌ Wrong pattern!")
 
-    # 3x3 grid
+    # 3x3 grid using native columns
     for row in range(3):
-        cols = st.columns([1, 1, 1, 2])  # extra col for spacing
+        cols = st.columns([1, 1, 1])
         for col_idx in range(3):
             dot_num = row * 3 + col_idx + 1
             already_pressed = dot_num in st.session_state.pattern_input
             label = "●" if already_pressed else "○"
-            if cols[col_idx].button(label, key=f"dot_{dot_num}", disabled=already_pressed, use_container_width=True):
+            
+            if cols[col_idx].button(label, key=f"dot_{dot_num}", disabled=already_pressed):
                 st.session_state.pattern_input.append(dot_num)
                 st.session_state.pattern_error = False
+                
                 # Check if pattern is complete
                 if len(st.session_state.pattern_input) == len(CORRECT_PATTERN):
                     if st.session_state.pattern_input == CORRECT_PATTERN:
@@ -93,12 +138,13 @@ def show_pattern_lock():
                 else:
                     st.rerun()
 
-    # Reset button
+    # Reset button in its own styled container
+    st.markdown('<div class="reset-row">', unsafe_allow_html=True)
     if st.button("🔄 Reset", use_container_width=False):
         st.session_state.pattern_input = []
         st.session_state.pattern_error = False
         st.rerun()
-
+    st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 

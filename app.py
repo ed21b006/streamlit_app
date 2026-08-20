@@ -59,14 +59,17 @@ def show_pattern_lock():
     
     /* Force Streamlit Columns to act as a Grid on Mobile */
     div[data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
         flex-wrap: nowrap !important; /* Prevent wrapping on small screens */
         justify-content: center !important;
-        gap: 0.5rem !important;
+        align-items: center !important;
+        gap: 1rem !important;
     }
     div[data-testid="column"] {
         width: auto !important;
         flex: 0 0 auto !important;
         min-width: auto !important;
+        padding: 0 !important;
     }
     
     /* Style the Buttons */

@@ -63,24 +63,31 @@ def show_pattern_lock():
         flex-wrap: nowrap !important; /* Prevent wrapping on small screens */
         justify-content: center !important;
         align-items: center !important;
-        gap: 1rem !important;
+        gap: 0.5rem !important;
+        padding: 0 !important;
+        margin: 0 auto !important;
+        max-width: 250px !important;
     }
     div[data-testid="column"] {
-        width: auto !important;
-        flex: 0 0 auto !important;
-        min-width: auto !important;
+        width: 70px !important;
+        flex: 0 0 70px !important;
+        min-width: 70px !important;
         padding: 0 !important;
+        margin: 0 !important;
+        display: flex !important;
+        justify-content: center !important;
     }
     
     /* Style the Buttons */
     div[data-testid="stHorizontalBlock"] button {
-        width: 70px !important; height: 70px !important;
+        width: 65px !important; height: 65px !important;
         border-radius: 50% !important; font-size: 1.4rem !important;
         font-weight: 700 !important;
         background: rgba(255,255,255,0.06) !important;
         border: 2px solid rgba(255,255,255,0.25) !important;
         color: rgba(255,255,255,0.4) !important;
         transition: all 0.2s ease !important;
+        margin: 0 !important; padding: 0 !important;
     }
     div[data-testid="stHorizontalBlock"] button:hover {
         border-color: rgba(167,139,250,0.6) !important;

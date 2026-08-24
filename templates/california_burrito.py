@@ -44,7 +44,6 @@ OUTLET       = "Outlet STN"
 DATE         = "18-07-2026"
 TIME         = "10:31 PM"
 MOBILE       = "8278693542"
-POINTS_EARNED= "67"
 
 ITEMS = []
 
@@ -201,7 +200,8 @@ def generate_invoice():
 
     # loyalty
     dt(draw, M, y, f"Mob: {MOBILE}", fr)
-    dt(draw, W-M-msr(f"Points earned: {POINTS_EARNED}", fr), y, f"Points earned: {POINTS_EARNED}", fr); y += lh
+    points_earned = round((sub - DISCOUNT + OTHER_CHARGES) * 0.04)
+    dt(draw, W-M-msr(f"Points earned: {points_earned}", fr), y, f"Points earned: {points_earned}", fr); y += lh
     for ln in [LOYALTY_LINE1, LOYALTY_LINE2, LOYALTY_LINE3]:
         dt(draw, cx(ln, fr, W), y, ln, fr); y += lh
     y += P; y = sep(draw, y, W, M, dashed=True) + P

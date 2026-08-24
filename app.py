@@ -10,6 +10,7 @@ import json
 import inspect
 import io
 import zipfile
+from datetime import datetime, time as dt_time, date as dt_date
 
 # Set page config
 st.set_page_config(page_title="Invoice Generator", layout="wide")
@@ -266,6 +267,8 @@ st.title("🧾 Dynamic Invoice Generator")
 def clear_old_invoices():
     for ext in ["*.png", "*.pdf"]:
         for f in glob.glob(os.path.join(APP_DIR, ext)):
+            if os.path.basename(f) == "logo.png":
+                continue
             try:
                 os.remove(f)
             except Exception:
@@ -354,18 +357,188 @@ variables = [v for v in dir(module) if v.isupper() and not v.startswith('_')]
 if "OUTPUT_FILE" in variables:
     variables.remove("OUTPUT_FILE")
 
+# ─────────────────────────────────────────────
+#  DATE/TIME PICKER & AUTO-DERIVED FIELDS
+# ─────────────────────────────────────────────
+
+# Identify bill number variable name for this template
+BILL_NO_VARS = ["BILL_NO", "INVOICE_NO", "ORDER_ID"]
+bill_no_var = None
+for bnv in BILL_NO_VARS:
+    if bnv in variables:
+        bill_no_var = bnv
+        break
+
+# Identify date/time variables
+DATE_VARS = ["DATE", "ORDER_DATE", "DUE_DATE"]
+TIME_VARS = ["TIME"]
+
+# Detect which date/time vars exist in this template
+template_date_vars = [v for v in DATE_VARS if v in variables]
+template_time_vars = [v for v in TIME_VARS if v in variables]
+
+# Parse the default date from the template to use as the base date for bill number formula
+default_date_str = ""
+for dv in template_date_vars:
+    val = getattr(module, dv, "")
+    if val:
+        default_date_str = val
+        break
+
+default_template_date = None
+if default_date_str:
+    try:
+        default_template_date = date_parse(str(default_date_str)).date()
+    except Exception:
+        default_template_date = dt_date(2026, 7, 11)  # fallback
+else:
+    default_template_date = dt_date(2026, 7, 11)
+
+# Parse the default time
+default_time_str = ""
+for tv in template_time_vars:
+    val = getattr(module, tv, "")
+    if val:
+        default_time_str = val
+        break
+
+default_template_time = dt_time(9, 0)
+if default_time_str:
+    try:
+        default_template_time = date_parse(str(default_time_str)).time()
+    except Exception:
+        pass
+
 st.header("📝 Invoice Details")
+
+# Date & Time picker section
+st.subheader("📅 Bill Date & Time")
+dt_col1, dt_col2 = st.columns(2)
+with dt_col1:
+    bill_date = st.date_input("Bill Date", value=default_template_date)
+with dt_col2:
+    bill_time = st.time_input("Bill Time", value=default_template_time)
+
+bill_datetime = datetime.combine(bill_date, bill_time)
+
+# ── Auto-generate bill number ──
+# Formula: 500 * days_since_default + hours * 20 + minutes
+days_diff = (bill_date - default_template_date).days
+bill_hours = bill_time.hour
+bill_minutes = bill_time.minute
+auto_bill_number = abs(days_diff) * 500 + bill_hours * 20 + bill_minutes
+
+# ── Helper: format date in the style of the template's default ──
+def detect_date_format(original_str):
+    """Detect the date format used by the template and return a strftime format string."""
+    original = str(original_str).strip()
+    # "Jul 11, 2026" or "Jul 10 2026"
+    if re.match(r'^[A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4}$', original):
+        if ',' in original:
+            return "%b %d, %Y"
+        return "%b %d %Y"
+    # "16 May 2024"
+    if re.match(r'^\d{1,2}\s+[A-Z][a-z]+\s+\d{4}$', original):
+        return "%d %b %Y"
+    # "06-Jul-2026"
+    if re.match(r'^\d{2}-[A-Z][a-z]{2}-\d{4}$', original):
+        return "%d-%b-%Y"
+    # "DD/MM/YYYY" or "DD-MM-YYYY"
+    if re.match(r'^\d{2}[/-]\d{2}[/-]\d{4}$', original):
+        sep = '/' if '/' in original else '-'
+        return f"%d{sep}%m{sep}%Y"
+    # "DD/MM/YY" or "DD-MM-YY"
+    if re.match(r'^\d{2}[/-]\d{2}[/-]\d{2}$', original):
+        sep = '/' if '/' in original else '-'
+        return f"%d{sep}%m{sep}%y"
+    # Fallback
+    return "%d/%m/%Y"
+
+def detect_time_format(original_str):
+    """Detect the time format used by the template."""
+    original = str(original_str).strip()
+    # "10:31 PM" or "09:15 PM" (12-hour with AM/PM)
+    if re.match(r'^\d{1,2}:\d{2}\s*[APap][Mm]$', original):
+        return "%I:%M %p"
+    # "20:34" or "22:51" (24-hour)
+    if re.match(r'^\d{1,2}:\d{2}$', original):
+        return "%H:%M"
+    # "14:17:31" (24-hour with seconds)
+    if re.match(r'^\d{1,2}:\d{2}:\d{2}$', original):
+        return "%H:%M:%S"
+    # Fallback
+    return "%H:%M"
+
+# ── Compute auto-derived date/time values ──
+auto_derived = {}  # var_name -> (formatted_value, type)
+
+for dv in template_date_vars:
+    orig = str(getattr(module, dv, ""))
+    fmt = detect_date_format(orig)
+    # For DUE_DATE, add 1 day offset from ORDER_DATE
+    if dv == "DUE_DATE":
+        from datetime import timedelta
+        # Calculate original offset between ORDER_DATE and DUE_DATE
+        try:
+            orig_order = date_parse(str(getattr(module, "ORDER_DATE", getattr(module, "DATE", "")))).date()
+            orig_due = date_parse(orig).date()
+            day_offset = (orig_due - orig_order).days
+        except Exception:
+            day_offset = 1
+        due_date = bill_date + timedelta(days=day_offset)
+        auto_derived[dv] = (due_date.strftime(fmt), str)
+    else:
+        auto_derived[dv] = (bill_date.strftime(fmt), str)
+
+for tv in template_time_vars:
+    orig = str(getattr(module, tv, ""))
+    fmt = detect_time_format(orig)
+    auto_derived[tv] = (bill_datetime.strftime(fmt), str)
+
+# ── Auto-derive bill number ──
+if bill_no_var:
+    orig_bill = str(getattr(module, bill_no_var, ""))
+    # Try to preserve prefix pattern (e.g., "SAR" from "SAR0001721", "F-" from "F-4026")
+    prefix_match = re.match(r'^([A-Za-z#-]+)', orig_bill)
+    prefix = prefix_match.group(1) if prefix_match else ""
+    # Check if original has zero-padding
+    digits_match = re.search(r'(\d+)$', orig_bill)
+    if digits_match:
+        orig_digits = digits_match.group(1)
+        pad_len = len(orig_digits)
+        auto_bill_str = f"{prefix}{str(auto_bill_number).zfill(pad_len)}"
+    else:
+        auto_bill_str = f"{prefix}{auto_bill_number}"
+    auto_derived[bill_no_var] = (auto_bill_str, str)
+
+# Show auto-derived values
+if auto_derived:
+    with st.expander("🔢 Auto-derived Date/Time & Bill Number", expanded=True):
+        for var_name, (val, _) in auto_derived.items():
+            st.text(f"{var_name}: {val}")
+
+# ── Set of variables to skip from manual editing ──
+skip_vars = set(auto_derived.keys())
+
+st.markdown("---")
+
 col1, col2 = st.columns(2)
 
 new_values = {}
 
+# Add auto-derived values to new_values first
+for var_name, (val, vtype) in auto_derived.items():
+    new_values[var_name] = (val, vtype)
+
 # Group variables
 items_var = "ITEMS" if "ITEMS" in variables else None
-other_vars = [v for v in variables if v != items_var]
+other_vars = [v for v in variables if v != items_var and v not in skip_vars]
 
-for i, var in enumerate(other_vars):
+manual_idx = 0
+for var in other_vars:
     current_val = getattr(module, var)
-    target_col = col1 if i % 2 == 0 else col2
+    target_col = col1 if manual_idx % 2 == 0 else col2
+    manual_idx += 1
     
     if isinstance(current_val, str):
         val = target_col.text_input(var, value=current_val)
@@ -464,13 +637,25 @@ if "current_template" not in st.session_state or st.session_state.current_templa
     items = getattr(module, items_var) if items_var else []
     
     st.session_state.is_tuple = False
+    st.session_state.tuple_len = 3  # default tuple length
     if items:
         if isinstance(items[0], tuple):
             st.session_state.is_tuple = True
+            st.session_state.tuple_len = len(items[0])
             formatted_items = []
             if len(items[0]) == 3:
                 for it in items:
                     formatted_items.append({"Name": it[0], "Qty": it[1], "Rate": it[2]})
+            elif len(items[0]) == 5:
+                # Laundry template: (description, sub_description, unit_price, quantity_str, total)
+                for it in items:
+                    formatted_items.append({
+                        "Description": it[0],
+                        "Sub Description": it[1],
+                        "Unit Price": it[2],
+                        "Quantity": it[3],
+                        "Total": it[4]
+                    })
             else:
                 for it in items:
                     d = {}
@@ -524,7 +709,11 @@ with st.expander("📖 Manage Menu"):
 if items_var:
     df = pd.DataFrame(st.session_state.invoice_items)
     if df.empty:
-        df = pd.DataFrame(columns=["Name", "Qty", "Rate"])
+        tuple_len = getattr(st.session_state, 'tuple_len', 3)
+        if tuple_len == 5:
+            df = pd.DataFrame(columns=["Description", "Sub Description", "Unit Price", "Quantity", "Total"])
+        else:
+            df = pd.DataFrame(columns=["Name", "Qty", "Rate"])
     edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
     st.session_state.invoice_items = edited_df.to_dict('records')
 else:
@@ -628,47 +817,34 @@ if st.button("🚀 Generate Invoice", type="primary"):
                 final_items = new_items_list
             setattr(module, items_var, final_items)
             
-        # Determine dynamic filename
-        date_str = ""
-        time_str = ""
-        
-        if "DATE" in new_values:
-            date_str = new_values["DATE"][0]
-        elif hasattr(module, "DATE"):
-            date_str = getattr(module, "DATE")
-            
-        if "TIME" in new_values:
-            time_str = new_values["TIME"][0]
-        elif hasattr(module, "TIME"):
-            time_str = getattr(module, "TIME")
-            
+        # Determine dynamic filename using bill_date and bill_time from the picker
         dynamic_name = getattr(module, "OUTPUT_FILE", "invoice.png")
-        if date_str:
-            try:
-                parsed_date = date_parse(str(date_str))
-                day = parsed_date.day
-                month = parsed_date.strftime("%B")
-                
+        _, ext = os.path.splitext(dynamic_name)
+        if not ext:
+            ext = ".png"
+            
+        try:
+            day = bill_date.day
+            month = bill_date.strftime("%B")
+            
+            if "bumble_dry" in selected_template.lower():
+                dynamic_name = f"Laundry {day} {month}{ext}"
+            else:
                 meal_type = ""
-                if time_str:
-                    try:
-                        parsed_time = date_parse(str(time_str))
-                        hour = parsed_time.hour
-                        if hour < 12:
-                            meal_type = "Breakfast"
-                        elif hour < 16:
-                            meal_type = "Lunch"
-                        else:
-                            meal_type = "Dinner"
-                    except Exception:
-                        pass
+                hour = bill_time.hour
+                if hour < 12:
+                    meal_type = "Breakfast"
+                elif hour < 16:
+                    meal_type = "Lunch"
+                else:
+                    meal_type = "Dinner"
                 
                 if meal_type:
-                    dynamic_name = f"{meal_type} {day} {month}.png"
+                    dynamic_name = f"{meal_type} {day} {month}{ext}"
                 else:
-                    dynamic_name = f"{day} {month}.png"
-            except Exception:
-                pass
+                    dynamic_name = f"{day} {month}{ext}"
+        except Exception:
+            pass
                 
         setattr(module, "OUTPUT_FILE", dynamic_name)
         
@@ -683,9 +859,14 @@ if st.button("🚀 Generate Invoice", type="primary"):
             if os.path.exists(out_path):
                 st.success("✅ Invoice generated successfully!")
                 
-                # Display image
-                image = Image.open(out_path)
-                st.image(image, caption="Generated Invoice", use_container_width=True)
+                is_pdf = out_path.lower().endswith(".pdf")
+                
+                if not is_pdf:
+                    # Display image
+                    image = Image.open(out_path)
+                    st.image(image, caption="Generated Invoice", use_container_width=True)
+                else:
+                    st.info("PDF document generated successfully. Please download it below.")
                 
                 # Download button
                 with open(out_path, "rb") as f:
@@ -693,7 +874,7 @@ if st.button("🚀 Generate Invoice", type="primary"):
                         label="⬇️ Download Invoice",
                         data=f,
                         file_name=output_file,
-                        mime="image/png"
+                        mime="application/pdf" if is_pdf else "image/png"
                     )
             else:
                 st.error(f"Output file {output_file} not found after generation.")

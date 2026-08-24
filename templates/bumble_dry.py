@@ -57,7 +57,7 @@ TERMS = [
     "Customers must disclose at the time of placing or picking up if any item is premium/expensive and requires special care; failure to do so will release BumbleDry from liability for any damage caused.",
 ]
 
-OUTPUT_FILE = "bumble_dry_invoice.pdf"
+OUTPUT_FILE = "bumble_dry_invoice.html"
 
 # ─────────────────────────────────────────────
 #  INTERNAL CALCULATIONS
@@ -527,19 +527,11 @@ def generate_invoice():
 </body>
 </html>"""
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        page.set_viewport_size({"width": 794, "height": 1123})  # A4 at 96dpi
-        page.set_content(html_content)
-        page.wait_for_load_state("networkidle")
-
-        app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        out_path = os.path.join(app_dir, OUTPUT_FILE)
-        
-        page.pdf(path=out_path, format="A4", print_background=True)
-
-        browser.close()
+    app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out_path = os.path.join(app_dir, OUTPUT_FILE)
+    
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
 
     print(f"✅  Invoice saved → {OUTPUT_FILE}")
 

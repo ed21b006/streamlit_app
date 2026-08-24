@@ -265,7 +265,7 @@ st.title("🧾 Dynamic Invoice Generator")
 
 @st.cache_resource
 def clear_old_invoices():
-    for ext in ["*.png", "*.pdf"]:
+    for ext in ["*.png", "*.pdf", "*.html"]:
         for f in glob.glob(os.path.join(APP_DIR, ext)):
             if os.path.basename(f) == "logo.png":
                 continue
@@ -860,13 +860,20 @@ if st.button("🚀 Generate Invoice", type="primary"):
                 st.success("✅ Invoice generated successfully!")
                 
                 is_pdf = out_path.lower().endswith(".pdf")
+                is_html = out_path.lower().endswith(".html")
                 
-                if not is_pdf:
+                if not is_pdf and not is_html:
                     # Display image
                     image = Image.open(out_path)
                     st.image(image, caption="Generated Invoice", use_container_width=True)
                 else:
-                    st.info("PDF document generated successfully. Please download it below.")
+                    doc_type = "PDF" if is_pdf else "HTML document"
+                    st.info(f"{doc_type} generated successfully. Please download it below.")
+                
+                # Determine mime type
+                mime_type = "image/png"
+                if is_pdf: mime_type = "application/pdf"
+                if is_html: mime_type = "text/html"
                 
                 # Download button
                 with open(out_path, "rb") as f:
@@ -874,7 +881,7 @@ if st.button("🚀 Generate Invoice", type="primary"):
                         label="⬇️ Download Invoice",
                         data=f,
                         file_name=output_file,
-                        mime="application/pdf" if is_pdf else "image/png"
+                        mime=mime_type
                     )
             else:
                 st.error(f"Output file {output_file} not found after generation.")

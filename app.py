@@ -361,13 +361,9 @@ if "OUTPUT_FILE" in variables:
 #  DATE/TIME PICKER & AUTO-DERIVED FIELDS
 # ─────────────────────────────────────────────
 
-# Identify bill number variable name for this template
-BILL_NO_VARS = ["BILL_NO", "INVOICE_NO", "ORDER_ID"]
-bill_no_var = None
-for bnv in BILL_NO_VARS:
-    if bnv in variables:
-        bill_no_var = bnv
-        break
+# Identify bill number variable names for this template
+BILL_NO_VARS = ["BILL_NO", "INVOICE_NO", "ORDER_ID", "ORDER_NO", "RECEIPT_NO", "BILL_NUMBER", "INVOICE_NUMBER", "ORDER_NUMBER"]
+template_bill_vars = [v for v in variables if v in BILL_NO_VARS]
 
 # Identify date/time variables
 DATE_VARS = ["DATE", "ORDER_DATE", "DUE_DATE"]
@@ -421,12 +417,12 @@ with dt_col2:
 
 bill_datetime = datetime.combine(bill_date, bill_time)
 
-# ── Auto-generate bill number ──
-# Formula: 500 * days_since_default + hours * 20 + minutes
+# ── Auto-generate bill number offset ──
+# Formula: 500 * days_since_default + hours * 15 + minutes * 3
 days_diff = (bill_date - default_template_date).days
 bill_hours = bill_time.hour
 bill_minutes = bill_time.minute
-auto_bill_number = abs(days_diff) * 500 + bill_hours * 20 + bill_minutes
+bill_offset = days_diff * 500 + bill_hours * 15 + bill_minutes * 3
 
 # ── Helper: format date in the style of the template's default ──
 def detect_date_format(original_str):
@@ -496,20 +492,26 @@ for tv in template_time_vars:
     auto_derived[tv] = (bill_datetime.strftime(fmt), str)
 
 # ── Auto-derive bill number ──
-if bill_no_var:
-    orig_bill = str(getattr(module, bill_no_var, ""))
-    # Try to preserve prefix pattern (e.g., "SAR" from "SAR0001721", "F-" from "F-4026")
-    prefix_match = re.match(r'^([A-Za-z#-]+)', orig_bill)
-    prefix = prefix_match.group(1) if prefix_match else ""
-    # Check if original has zero-padding
+for b_var in template_bill_vars:
+    orig_bill = str(getattr(module, b_var, ""))
+    # Check if original has trailing digits
     digits_match = re.search(r'(\d+)$', orig_bill)
     if digits_match:
         orig_digits = digits_match.group(1)
         pad_len = len(orig_digits)
-        auto_bill_str = f"{prefix}{str(auto_bill_number).zfill(pad_len)}"
+        base_num = int(orig_digits)
+        new_num = base_num + bill_offset
+        
+        new_num_str = str(abs(new_num))
+        if len(new_num_str) > pad_len:
+            new_num_str = new_num_str[-pad_len:]
+        else:
+            new_num_str = new_num_str.zfill(pad_len)
+            
+        auto_bill_str = orig_bill[:digits_match.start()] + new_num_str
     else:
-        auto_bill_str = f"{prefix}{auto_bill_number}"
-    auto_derived[bill_no_var] = (auto_bill_str, str)
+        auto_bill_str = f"{orig_bill}{bill_offset}"
+    auto_derived[b_var] = (auto_bill_str, str)
 
 # Show auto-derived values
 if auto_derived:

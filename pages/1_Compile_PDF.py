@@ -10,9 +10,9 @@ Upload multiple generated invoice images here to compile them into a single PDF 
 The layout is optimized into a grid so you can cut them with scissors using straight continuous cuts!
 """)
 
-# --- Helper: mm to pixels at 300 DPI ---
+# --- Helper: mm to pixels at 600 DPI ---
 def mm_to_px(mm):
-    return int(mm * 300 / 25.4)
+    return int(mm * 600 / 25.4)
 
 # --- Controls ---
 col1, col2 = st.columns(2)
@@ -43,9 +43,9 @@ if st.button("🔨 Compile PDF", type="primary"):
         st.warning("Please upload at least one image.")
     else:
         with st.spinner("Compiling PDF..."):
-            # A4 dimensions at 300 DPI
-            PAGE_W = 2480
-            PAGE_H = 3508
+            # A4 dimensions at 600 DPI
+            PAGE_W = 4960
+            PAGE_H = 7016
             
             margin = mm_to_px(page_margin_mm)
             h_gap = mm_to_px(h_gap_mm)
@@ -128,7 +128,7 @@ if st.button("🔨 Compile PDF", type="primary"):
             
             pdf_bytes = io.BytesIO()
             if len(pages) > 0:
-                pages[0].save(pdf_bytes, format="PDF", save_all=True, append_images=pages[1:], resolution=300)
+                pages[0].save(pdf_bytes, format="PDF", save_all=True, append_images=pages[1:], resolution=600)
             pdf_bytes.seek(0)
             
             st.session_state["pdf_bytes"] = pdf_bytes.getvalue()

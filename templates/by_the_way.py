@@ -140,7 +140,7 @@ def generate_invoice():
 
     font_reg, font_bold, font_bold_lg, font_order = load_fonts(26)
 
-    est_height = 800 + len(ITEMS) * line_h
+    est_height = 1500 + len(ITEMS) * line_h
     img  = Image.new("RGB", (W, est_height), color=(255, 255, 255))
     draw = ImageDraw.Draw(img)
     y    = 28

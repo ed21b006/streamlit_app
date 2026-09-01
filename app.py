@@ -277,12 +277,43 @@ def clear_old_invoices():
 
 clear_old_invoices()
 
-# --- PATCH IMAGEFONT FOR DEPLOYMENT ---
-# The templates use hardcoded Linux font paths (/usr/share/...).\n# When deployed on Streamlit Cloud, those paths don't exist, causing fallback to tiny default fonts.
-# We intercept those calls to redirect them to our local 'fonts/' directory.
-original_truetype = ImageFont.truetype
+# ─────────────────────────────────────────────
+#  GLOBAL DPI SCALING (Monkey Patch PIL)
+# ─────────────────────────────────────────────
+from PIL import Image, ImageDraw, ImageFont
 
+SCALE = 3
+
+original_new = Image.new
+def patched_new(mode, size, color=0):
+    real_size = (int(size[0] * SCALE), int(size[1] * SCALE))
+    img = original_new(mode, real_size, color)
+    original_crop = img.crop
+    def patched_crop(box=None):
+        if box is not None:
+            box = tuple(int(v * SCALE) for v in box)
+        return original_crop(box)
+    img.crop = patched_crop
+    return img
+Image.new = patched_new
+
+class ScaledFont:
+    def __init__(self, real_font):
+        self.real_font = real_font
+    def getbbox(self, text, *args, **kwargs):
+        bbox = self.real_font.getbbox(text, *args, **kwargs)
+        if bbox is None: return None
+        return tuple(v / SCALE for v in bbox)
+    def getlength(self, text, *args, **kwargs):
+        length = self.real_font.getlength(text, *args, **kwargs)
+        return length / SCALE
+    def getsize(self, text, *args, **kwargs):
+        size = self.real_font.getsize(text, *args, **kwargs)
+        return tuple(v / SCALE for v in size)
+
+original_truetype = ImageFont.truetype
 def patched_truetype(font=None, size=10, index=0, encoding='', layout_engine=None):
+    real_size = int(size * SCALE)
     if isinstance(font, str):
         if "DejaVuSansMono-Bold" in font:
             font = os.path.join(APP_DIR, "fonts", "DejaVuSansMono-Bold.ttf")
@@ -290,13 +321,38 @@ def patched_truetype(font=None, size=10, index=0, encoding='', layout_engine=Non
             font = os.path.join(APP_DIR, "fonts", "DejaVuSansMono.ttf")
     
     try:
-        return original_truetype(font, size, index, encoding, layout_engine)
+        real_font = original_truetype(font, real_size, index, encoding, layout_engine)
     except OSError:
-        # Final fallback to standard local font if it fails for some reason
-        return original_truetype(os.path.join(APP_DIR, "fonts", "DejaVuSansMono.ttf"), size, index, encoding, layout_engine)
+        real_font = original_truetype(os.path.join(APP_DIR, "fonts", "DejaVuSansMono.ttf"), real_size, index, encoding, layout_engine)
+    return ScaledFont(real_font)
 
 ImageFont.truetype = patched_truetype
-# --------------------------------------
+
+original_draw = ImageDraw.Draw
+def patched_draw(im, mode=None):
+    real_draw = original_draw(im, mode)
+    class DrawWrapper:
+        def text(self, xy, text, fill=None, font=None, anchor=None, *args, **kwargs):
+            real_xy = (xy[0] * SCALE, xy[1] * SCALE)
+            real_font = font.real_font if isinstance(font, ScaledFont) else font
+            real_draw.text(real_xy, text, fill=fill, font=real_font, anchor=anchor, *args, **kwargs)
+        def line(self, xy, fill=None, width=0, *args, **kwargs):
+            if isinstance(xy[0], (list, tuple)):
+                real_xy = [(x * SCALE, y * SCALE) for x, y in xy]
+            else:
+                real_xy = [v * SCALE for v in xy]
+            real_width = max(1, int(width * SCALE)) if width else 0
+            real_draw.line(real_xy, fill=fill, width=real_width, *args, **kwargs)
+        def rectangle(self, xy, fill=None, outline=None, width=1, *args, **kwargs):
+            if isinstance(xy[0], (list, tuple)):
+                real_xy = [(x * SCALE, y * SCALE) for x, y in xy]
+            else:
+                real_xy = [v * SCALE for v in xy]
+            real_width = max(1, int(width * SCALE)) if width else 1
+            real_draw.rectangle(real_xy, fill=fill, outline=outline, width=real_width, *args, **kwargs)
+    return DrawWrapper()
+ImageDraw.Draw = patched_draw
+# ─────────────────────────────────────────────
 
 # Find all template files
 template_files = glob.glob(os.path.join(TEMPLATES_DIR, "*.py"))

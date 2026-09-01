@@ -92,6 +92,22 @@ def sep(draw, y, W, M, thick=False):
     return y + (4 if thick else 2)
 
 
+
+
+def wrap(text, font, max_w, measure_func):
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        t = (cur + " " + w).strip()
+        if measure_func(t, font) <= max_w:
+            cur = t
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines or [text]
+
 def generate_invoice():
     net_amount = sum(q * r for _, q, r in ITEMS)
     sc_amt     = round(net_amount * SC_RATE / 100, 2)
@@ -137,7 +153,11 @@ def generate_invoice():
     for name, qty, rate in ITEMS:
         amount = qty * rate
         qs = str(qty); rs = f"{rate:.2f}"; as_ = f"{amount:.2f}"
-        dt(draw, ci, y, name, fr)
+        dls = wrap(name, fr, cq - ci - 12, msr)
+        for dl in dls[:-1]:
+            dt(draw, ci, y, dl, fr)
+            y += lh
+        dt(draw, ci, y, dls[-1], fr)
         dt(draw, cq - msr(qs,  fr)//2, y, qs,  fr)
         dt(draw, cr - msr(rs,  fr),    y, rs,  fr)
         dt(draw, ca - msr(as_, fr),    y, as_, fr); y += lh

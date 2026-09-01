@@ -89,6 +89,22 @@ def draw_separator(draw, y, width, margin, color=(20, 20, 20)):
     return y + 2
 
 
+
+
+def wrap(text, font, max_w, measure_func):
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        t = (cur + " " + w).strip()
+        if measure_func(t, font) <= max_w:
+            cur = t
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines or [text]
+
 def generate_invoice():
     total_items, sub_total, grand_total = compute_totals(ITEMS)
 
@@ -155,9 +171,13 @@ def generate_invoice():
         qty_str   = str(qty)
         rate_str  = f"{rate:.2f}"
         amt_str   = f"{amount:.2f}"
-        draw_text(draw, col_item,                                          y, name,     font_reg)
+        dls = wrap(name, font_reg, col_qty - col_item - 12, measure)
+        for dl in dls[:-1]:
+            draw_text(draw, col_item, y, dl, font_reg)
+            y += line_h
+        draw_text(draw, col_item, y, dls[-1], font_reg)
         draw_text(draw, col_qty    - measure(qty_str,   font_reg)//2,     y, qty_str,  font_reg)
-        draw_text(draw, col_rate   - measure(rate_str,  font_reg)//2,     y, rate_str, font_reg)
+        draw_text(draw, col_rate   - measure(rate_str,  font_reg),     y, rate_str, font_reg)
         draw_text(draw, col_amount - measure(amt_str,   font_reg),        y, amt_str,  font_reg)
         y += line_h
 

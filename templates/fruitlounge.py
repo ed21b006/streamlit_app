@@ -84,6 +84,22 @@ def sep(draw, y, W, M, thick=False):
     return y + (4 if thick else 2)
 
 
+
+
+def wrap(text, font, max_w, measure_func):
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        t = (cur + " " + w).strip()
+        if measure_func(t, font) <= max_w:
+            cur = t
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines or [text]
+
 def generate_invoice():
     sub_total = sum(q * p for _, q, p in ITEMS)
     cgst_amt  = round(sub_total * CGST_RATE / 100, 2)
@@ -125,7 +141,11 @@ def generate_invoice():
     for name, qty, price in ITEMS:
         total_item = qty * price
         qs = str(qty); ps = f"{price:.2f}"; ts = f"{total_item:.2f}"
-        dt(draw, ci, y, name, fr)
+        dls = wrap(name, fr, cq - ci - 12, msr)
+        for dl in dls[:-1]:
+            dt(draw, ci, y, dl, fr)
+            y += lh
+        dt(draw, ci, y, dls[-1], fr)
         dt(draw, cq - msr(qs, fr)//2, y, qs, fr)
         dt(draw, cp - msr(ps, fr),    y, ps, fr)
         dt(draw, ca - msr(ts, fr),    y, ts, fr); y += lh

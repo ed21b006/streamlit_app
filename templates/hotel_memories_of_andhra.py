@@ -105,6 +105,22 @@ def draw_separator(draw, y, width, margin, thick=False, color=(20, 20, 20)):
     return y + (3 if thick else 2)
 
 
+
+
+def wrap(text, font, max_w, measure_func):
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        t = (cur + " " + w).strip()
+        if measure_func(t, font) <= max_w:
+            cur = t
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines or [text]
+
 def generate_invoice():
     total_qty, sub_total, cgst_amt, sgst_amt, grand_total = compute_totals(ITEMS, CGST_RATE, SGST_RATE)
 
@@ -176,7 +192,7 @@ def generate_invoice():
 
     draw_text(draw, col_item,                                      y, "Item",   font_reg)
     draw_text(draw, col_qty   - measure("Qty.",   font_reg)//2,    y, "Qty.",   font_reg)
-    draw_text(draw, col_price - measure("Price",  font_reg)//2,    y, "Price",  font_reg)
+    draw_text(draw, col_price - measure("Price",  font_reg),    y, "Price",  font_reg)
     draw_text(draw, col_amount - measure("Amount", font_reg),      y, "Amount", font_reg)
     y += line_h
 
@@ -188,9 +204,13 @@ def generate_invoice():
         qty_str   = str(qty)
         price_str = f"{price:.2f}"
         amt_str   = f"{amount:.2f}"
-        draw_text(draw, col_item,                                        y, name,      font_reg)
+        dls = wrap(name, font_reg, col_qty - col_item - 12, measure)
+        for dl in dls[:-1]:
+            draw_text(draw, col_item, y, dl, font_reg)
+            y += line_h
+        draw_text(draw, col_item, y, dls[-1], font_reg)
         draw_text(draw, col_qty   - measure(qty_str,   font_reg)//2,    y, qty_str,   font_reg)
-        draw_text(draw, col_price - measure(price_str, font_reg)//2,    y, price_str, font_reg)
+        draw_text(draw, col_price - measure(price_str, font_reg),    y, price_str, font_reg)
         draw_text(draw, col_amount - measure(amt_str,  font_reg),       y, amt_str,   font_reg)
         y += line_h
 

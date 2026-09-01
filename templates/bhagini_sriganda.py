@@ -129,6 +129,22 @@ def draw_solid_separator(draw, y, width, margin, color=(20, 20, 20)):
     return y + 2
 
 
+
+
+def wrap(text, font, max_w, measure_func):
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        t = (cur + " " + w).strip()
+        if measure_func(t, font) <= max_w:
+            cur = t
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines or [text]
+
 def generate_invoice():
     sub_total, cgst_amt, sgst_amt, grand_total = compute_totals(ITEMS, CGST_RATE, SGST_RATE)
 
@@ -190,7 +206,7 @@ def generate_invoice():
     col_total = W - MARGIN - 10
 
     draw_text(draw, col_item,                                  y, "Item",  font_reg)
-    draw_text(draw, col_price - measure("Price", font_reg)//2, y, "Price", font_reg)
+    draw_text(draw, col_price - measure("Price", font_reg), y, "Price", font_reg)
     draw_text(draw, col_qty   - measure("Qty",   font_reg)//2, y, "Qty",   font_reg)
     draw_text(draw, col_total - measure("Total", font_reg),    y, "Total", font_reg)
     y += line_h
@@ -204,8 +220,12 @@ def generate_invoice():
         price_str  = f"\u20b9{price}"
         qty_str    = str(qty)
         total_str  = f"\u20b9{total_item}"
-        draw_text(draw, col_item,                                        y, name,       font_reg)
-        draw_text(draw, col_price - measure(price_str, font_reg)//2,     y, price_str,  font_reg)
+        dls = wrap(name, font_reg, col_price - col_item - 12, measure)
+        for dl in dls[:-1]:
+            draw_text(draw, col_item, y, dl, font_reg)
+            y += line_h
+        draw_text(draw, col_item, y, dls[-1], font_reg)
+        draw_text(draw, col_price - measure(price_str, font_reg),     y, price_str,  font_reg)
         draw_text(draw, col_qty   - measure(qty_str,   font_reg)//2,     y, qty_str,    font_reg)
         draw_text(draw, col_total - measure(total_str, font_reg),        y, total_str,  font_reg)
         y += line_h

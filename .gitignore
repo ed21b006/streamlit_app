@@ -1,3 +1,5 @@
 .venv/
 menu_images/
-generated_invoice/
+generated_invoice*/
+*.zip
+

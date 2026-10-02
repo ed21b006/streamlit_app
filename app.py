@@ -279,23 +279,31 @@ clear_old_invoices()
 
 # ─────────────────────────────────────────────
 #  GLOBAL DPI SCALING (Monkey Patch PIL)
+#  Guard: only patch once per process lifetime.
+#  Streamlit reruns app.py top-level code on every
+#  interaction. Without this guard, each rerun would
+#  re-capture the already-patched functions as
+#  "originals", compounding the SCALE factor and
+#  eventually causing "invalid pixel size" from PIL.
 # ─────────────────────────────────────────────
 from PIL import Image, ImageDraw, ImageFont
 
 SCALE = 3
 
-original_new = Image.new
-def patched_new(mode, size, color=0):
-    real_size = (int(size[0] * SCALE), int(size[1] * SCALE))
-    img = original_new(mode, real_size, color)
-    original_crop = img.crop
-    def patched_crop(box=None):
-        if box is not None:
-            box = tuple(int(v * SCALE) for v in box)
-        return original_crop(box)
-    img.crop = patched_crop
-    return img
-Image.new = patched_new
+if not getattr(Image, "_pil_dpi_patched", False):
+    _original_new = Image.new
+    def patched_new(mode, size, color=0):
+        real_size = (int(size[0] * SCALE), int(size[1] * SCALE))
+        img = _original_new(mode, real_size, color)
+        original_crop = img.crop
+        def patched_crop(box=None):
+            if box is not None:
+                box = tuple(int(v * SCALE) for v in box)
+            return original_crop(box)
+        img.crop = patched_crop
+        return img
+    Image.new = patched_new
+    Image._pil_dpi_patched = True
 
 class ScaledFont:
     def __init__(self, real_font):
@@ -311,47 +319,49 @@ class ScaledFont:
         size = self.real_font.getsize(text, *args, **kwargs)
         return tuple(v / SCALE for v in size)
 
-original_truetype = ImageFont.truetype
-def patched_truetype(font=None, size=10, index=0, encoding='', layout_engine=None):
-    real_size = int(size * SCALE)
-    if isinstance(font, str):
-        if "DejaVuSansMono-Bold" in font:
-            font = os.path.join(APP_DIR, "fonts", "DejaVuSansMono-Bold.ttf")
-        elif "DejaVuSans" in font or "DejaVu" in font:
-            font = os.path.join(APP_DIR, "fonts", "DejaVuSansMono.ttf")
-    
-    try:
-        real_font = original_truetype(font, real_size, index, encoding, layout_engine)
-    except OSError:
-        real_font = original_truetype(os.path.join(APP_DIR, "fonts", "DejaVuSansMono.ttf"), real_size, index, encoding, layout_engine)
-    return ScaledFont(real_font)
+if not getattr(ImageFont, "_pil_dpi_patched", False):
+    _original_truetype = ImageFont.truetype
+    def patched_truetype(font=None, size=10, index=0, encoding='', layout_engine=None):
+        real_size = int(size * SCALE)
+        if isinstance(font, str):
+            if "DejaVuSansMono-Bold" in font:
+                font = os.path.join(APP_DIR, "fonts", "DejaVuSansMono-Bold.ttf")
+            elif "DejaVuSans" in font or "DejaVu" in font:
+                font = os.path.join(APP_DIR, "fonts", "DejaVuSansMono.ttf")
+        try:
+            real_font = _original_truetype(font, real_size, index, encoding, layout_engine)
+        except OSError:
+            real_font = _original_truetype(os.path.join(APP_DIR, "fonts", "DejaVuSansMono.ttf"), real_size, index, encoding, layout_engine)
+        return ScaledFont(real_font)
+    ImageFont.truetype = patched_truetype
+    ImageFont._pil_dpi_patched = True
 
-ImageFont.truetype = patched_truetype
-
-original_draw = ImageDraw.Draw
-def patched_draw(im, mode=None):
-    real_draw = original_draw(im, mode)
-    class DrawWrapper:
-        def text(self, xy, text, fill=None, font=None, anchor=None, *args, **kwargs):
-            real_xy = (xy[0] * SCALE, xy[1] * SCALE)
-            real_font = font.real_font if isinstance(font, ScaledFont) else font
-            real_draw.text(real_xy, text, fill=fill, font=real_font, anchor=anchor, *args, **kwargs)
-        def line(self, xy, fill=None, width=0, *args, **kwargs):
-            if isinstance(xy[0], (list, tuple)):
-                real_xy = [(x * SCALE, y * SCALE) for x, y in xy]
-            else:
-                real_xy = [v * SCALE for v in xy]
-            real_width = max(1, int(width * SCALE)) if width else 0
-            real_draw.line(real_xy, fill=fill, width=real_width, *args, **kwargs)
-        def rectangle(self, xy, fill=None, outline=None, width=1, *args, **kwargs):
-            if isinstance(xy[0], (list, tuple)):
-                real_xy = [(x * SCALE, y * SCALE) for x, y in xy]
-            else:
-                real_xy = [v * SCALE for v in xy]
-            real_width = max(1, int(width * SCALE)) if width else 1
-            real_draw.rectangle(real_xy, fill=fill, outline=outline, width=real_width, *args, **kwargs)
-    return DrawWrapper()
-ImageDraw.Draw = patched_draw
+if not getattr(ImageDraw, "_pil_dpi_patched", False):
+    _original_draw = ImageDraw.Draw
+    def patched_draw(im, mode=None):
+        real_draw = _original_draw(im, mode)
+        class DrawWrapper:
+            def text(self, xy, text, fill=None, font=None, anchor=None, *args, **kwargs):
+                real_xy = (xy[0] * SCALE, xy[1] * SCALE)
+                real_font = font.real_font if isinstance(font, ScaledFont) else font
+                real_draw.text(real_xy, text, fill=fill, font=real_font, anchor=anchor, *args, **kwargs)
+            def line(self, xy, fill=None, width=0, *args, **kwargs):
+                if isinstance(xy[0], (list, tuple)):
+                    real_xy = [(x * SCALE, y * SCALE) for x, y in xy]
+                else:
+                    real_xy = [v * SCALE for v in xy]
+                real_width = max(1, int(width * SCALE)) if width else 0
+                real_draw.line(real_xy, fill=fill, width=real_width, *args, **kwargs)
+            def rectangle(self, xy, fill=None, outline=None, width=1, *args, **kwargs):
+                if isinstance(xy[0], (list, tuple)):
+                    real_xy = [(x * SCALE, y * SCALE) for x, y in xy]
+                else:
+                    real_xy = [v * SCALE for v in xy]
+                real_width = max(1, int(width * SCALE)) if width else 1
+                real_draw.rectangle(real_xy, fill=fill, outline=outline, width=real_width, *args, **kwargs)
+        return DrawWrapper()
+    ImageDraw.Draw = patched_draw
+    ImageDraw._pil_dpi_patched = True
 # ─────────────────────────────────────────────
 
 # Find all template files
@@ -944,6 +954,8 @@ if st.button("🚀 Generate Invoice", type="primary"):
             else:
                 st.error(f"Output file {output_file} not found after generation.")
         except Exception as e:
+            import traceback
             st.error(f"Error generating invoice: {e}")
+            st.code(traceback.format_exc(), language="python")
         finally:
             os.chdir(original_cwd)
